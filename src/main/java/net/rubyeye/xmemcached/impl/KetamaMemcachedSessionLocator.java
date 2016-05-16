@@ -91,6 +91,13 @@ AbstractMemcachedSessionLocator {
 
 	private final void buildMap(Collection<Session> list, HashAlgorithm alg) {
 		TreeMap<Long, List<Session>> sessionMap = new TreeMap<Long, List<Session>>();
+		
+        int totalWeight = 0;
+        for (Session session : list) {
+                if (session instanceof MemcachedTCPSession) {
+                        totalWeight += ((MemcachedSession) session).getWeight();
+                }
+        }
 
 		for (Session session : list) {
 			String sockStr = null;
@@ -117,8 +124,11 @@ AbstractMemcachedSessionLocator {
 			 */
 			int numReps = NUM_REPS;
 			if (session instanceof MemcachedTCPSession) {
-				numReps *= ((MemcachedSession) session).getWeight();
+                int weight = ((MemcachedSession) session).getWeight();
+                float pct = (float) weight / (float) totalWeight;
+                numReps = (int) ((Math.floor((float)(pct * NUM_REPS / 4 * list.size() + 0.0000000001))) * 4);
 			}
+			System.out.println("count:" + numReps);
 			if (alg == HashAlgorithm.KETAMA_HASH) {
 				for (int i = 0; i < numReps / 4; i++) {
 					byte[] digest = HashAlgorithm.computeMd5(sockStr + "-" + i);
@@ -129,7 +139,6 @@ AbstractMemcachedSessionLocator {
 								| digest[h * 4] & 0xFF;
 						this.getSessionList(sessionMap, k).add(session);
 					}
-
 				}
 			} else {
 				for (int i = 0; i < numReps; i++) {
